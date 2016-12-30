@@ -1,10 +1,17 @@
-MetaBall metaBallArray[] = new MetaBall[2];
+//constants
 final static boolean drawingCircles = false;
-static int widthMid, heightMid;
 int luminosity = 95;
+int numberOfBalls = 2;
 
-//===================================================================================================
-//Thread declarations for calculating all the pixels
+//handled at execution globals
+MetaBall metaBallArray[] = new MetaBall[numberOfBalls];
+static int widthMid, heightMid;
+
+//############################################################
+//-----------------------Pixel Threading----------------------
+//############################################################
+
+//Thread object declarations-------------------------------
 //quad1
 Thread q1 = new Thread(new Runnable(){
   @Override
@@ -33,7 +40,8 @@ Thread q4 = new Thread(new Runnable(){
       drawQuadFour();
   }
 });
-//threaded functions definitions
+
+//threaded function definitions.----------------------------
 void drawQuadOne(){//x: 0-mid y: 0-mid
   for (int x = 0; x < widthMid; x++) {
     for (int y = 0; y < heightMid; y++) {
@@ -41,7 +49,7 @@ void drawQuadOne(){//x: 0-mid y: 0-mid
       float sum = 0;
       for (MetaBall ball : metaBallArray) {
         float d = dist(x, y, ball.xPos, ball.yPos);
-        sum += luminosity * metaBallArray[0].r / d;
+        sum += luminosity * metaBallArray[0].radius / d;
       
         pixels[index] = color(sum, 100, 100);
       }
@@ -56,7 +64,7 @@ void drawQuadTwo(){//x: mid-max y:0-mid
       float sum = 0;
       for (MetaBall ball : metaBallArray) {
         float d = dist(x, y, ball.xPos, ball.yPos);
-        sum += luminosity * metaBallArray[0].r / d;
+        sum += luminosity * metaBallArray[0].radius / d;
       
         pixels[index] = color(sum, 100, 100);
       }
@@ -71,7 +79,7 @@ void drawQuadThree(){//x:0-mid y:mid-max
       float sum = 0;
       for (MetaBall ball : metaBallArray) {
         float d = dist(x, y, ball.xPos, ball.yPos);
-        sum += luminosity * metaBallArray[0].r / d;
+        sum += luminosity * metaBallArray[0].radius / d;
       
         pixels[index] = color(sum, 100, 100);
       }
@@ -86,43 +94,22 @@ void drawQuadFour(){//x:mid-max y:mid-max
       float sum = 0;
       for (MetaBall ball : metaBallArray) {
         float d = dist(x, y, ball.xPos, ball.yPos);
-        sum += luminosity * metaBallArray[0].r / d;
+        sum += luminosity * metaBallArray[0].radius / d;
       
         pixels[index] = color(sum, 100, 100);
       }
     }
   }
-}//end drawWuadFour
+}//end drawQuadFour
 
-//==============================================================End of pixel threading=====================================================================================
-
-void setup(){
-   //size(800,600);
-   fullScreen();
-   
-   widthMid = width /2;
-   heightMid = height / 2;
-   
-   //instantiate the balls
-   for (int i = 0; i < metaBallArray.length; i++){
-       metaBallArray[i] = new MetaBall(random(25, width-25), random(25, height-25)); //give a random position on the screen within the constraints of the screen.
-   }
-}//end setup()
-
-void draw(){
-  background(0);
-  
-  loadPixels();
-  noStroke();
-  colorMode(HSB, 100);
-  
-  //start thread pixel calculations
+void spawnAllPixelCalculationThreads(){
   q1.run();
   q2.run();
   q3.run();
-  q4.run();
-  
-  //join threads
+  q4.run(); 
+}
+
+void syncAllPixelCalculationThreads(){
   try{
     q1.join();
     q2.join();
@@ -132,22 +119,51 @@ void draw(){
   catch (Exception e) {
     System.out.println("Error: " + e);
   }
-  
-  //actually put the pixels up on screen, and begin processes again.
-  updatePixels();
-  
-  //hopefully our gravity calculations are complete by now.
+}//end syncAllThreads
+
+//##################################################
+//------------End of pixel threading----------------
+//##################################################
+
+void instantiateMetaBalls(){
   for (int i = 0; i < metaBallArray.length; i++){
-    metaBallArray[i].calculateForce(metaBallArray);
-    metaBallArray[i].update();
-    if (drawingCircles) {//draw the circles maybe?
+       metaBallArray[i] = new MetaBall(random(25, width-25), random(25, height-25)); //give a random position on the screen within the constraints of the screen.
+   }
+}
+
+void updateAllMetaBalls(){
+  for (int i = 0; i < metaBallArray.length; i++){
+    metaBallArray[i].calculateForceByGravity(metaBallArray);
+    metaBallArray[i].updateVelocity();
+    metaBallArray[i].resetAcceleration();
+    metaBallArray[i].updatePosition();
+    metaBallArray[i].ensureObjectIsOnscreen();  
+    if (drawingCircles) {//draw circles where metaBalls are (For testing only. Controlled by global constants.)
       metaBallArray[i].draw(); 
     }
   }
-}//end draw()
+}
 
-void gravity(){
-    for (int i = 0; i < metaBallArray.length; i++) {
-      metaBallArray[i].calculateForce(metaBallArray);
-    }
-}//end gravity()
+void setup(){//initializes important variables
+   //size(800,600);
+   fullScreen();
+   
+   widthMid = width /2;
+   heightMid = height / 2;
+   
+   instantiateMetaBalls();
+}//end setup()
+
+void draw(){ //handles all update calls 
+  background(0);
+  
+  loadPixels();
+  noStroke();
+  colorMode(HSB, 100);
+  
+  spawnAllPixelCalculationThreads();
+  syncAllPixelCalculationThreads();
+  updatePixels();
+  
+  updateAllMetaBalls();
+}//end draw()

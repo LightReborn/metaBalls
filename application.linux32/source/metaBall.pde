@@ -1,15 +1,16 @@
 class MetaBall{
-  float r;          //size in radius
+  float radius;          //size in radius
   float xPos, yPos; //position
   float xVel, yVel; //velocity
   float xAcc, yAcc; //acceleration
-  final static float massConstant = 25000;
-  final static float G = 0.00000000006673; //used in the calculateForce method to calculate the effects of gravity.
-//------------------------------------------------------------------------------------------------------------------
+  final static float massConstant = 25000; //used to tweak interactions between object. The larger the number the greater force each object will exert on other objects
+  final static float G = 0.00000000006673; //Universal gravity constant; used in the calculateForce method to calculate the effects of gravity.
+  
+//-----------------Constructors-----------------------------
   MetaBall(float x, float y, float r){
     xPos = x;
     yPos = y;
-    this.r = r;
+    radius = r;
     
     xVel = random(1,5)*3;
     yVel = random(1,5)*3;
@@ -18,20 +19,21 @@ class MetaBall{
   MetaBall (float x, float y){
     xPos = x;
     yPos = y;
-    r = random (20,100);
+    radius = random (20,100);
       
     xVel = random(1,5)*3;
     yVel = random(1,5)*3;
   }
-//-------------------------------------------------------------------------------------------------------------
-  void calculateForce(MetaBall balls[]){
-    //determine the amount of force exterted on this object by other objects.
-    for (int i = 0; i < balls.length; i++){
+//-------------end of constructors--------------------------
+
+  void calculateForceByGravity(MetaBall balls[]){
+    //determine the amount of force exterted on this object by all other objects.
+    for (int i = 0; i < balls.length; i++){ //for every object in the array.
+      // Formula for calculating force by gravity:
       // F = (G * m1 * m2) / d ^ 2
-      
-      //universal constant for gravity.
-      float m1 = this.r * massConstant;
-      float m2 = balls[i].r * massConstant;
+
+      float m1 = this.radius * massConstant;
+      float m2 = balls[i].radius * massConstant;
       
       //get distance
       float rx = balls[i].xPos - this.xPos;
@@ -39,71 +41,76 @@ class MetaBall{
       float d2 = rx*rx + ry*ry;
       float d = sqrt(d2);
       
-      if (d > r && d > balls[i].r){
+      if (d > radius && d > balls[i].radius){
         // normalize difference vector
-        float ux = rx / r;
-        float uy = ry / r;
+        float ux = rx / radius;
+        float uy = ry / radius;
 
-        // acceleration of gravity
+        // acceleration due to gravity
         float a = G * m1 * m2 / d2;
 
         float Fx = a * ux / 1000;
         float Fy = a * uy / 1000;
         
+        //I would like to seperate this out of this function later.
         this.applyForce(Fx,Fy);
       }
     }
-  }//end calculateForce()
+  }//end calculateForceByGravity()
   
-  void applyForce(float xForce, float yForce){//seperated from update for easy testing, and better coupling.
+  void applyForce(float xForce, float yForce){
     xAcc += xForce;
     yAcc += yForce;
   }//end applyForce()
   
-  void update(){    
+  void updateVelocity(){
     //update the velocity to account for acceleration.
     xVel += xAcc;
     yVel += yAcc;
-    
+  }//end updateVelocity
+  
+  void resetAcceleration(){
+    //set acceleration to 0.
+    this.xAcc = 0;
+    this.yAcc = 0; 
+  }//end resetAcceleration()
+  
+  void updatePosition(){
     xPos += xVel;
     yPos += yVel;
-    
+  }//end updatePosition()
+  
+  void ensureObjectIsOnscreen(){
     //ensure the objects stay on screen.
-    if (this.xPos - r/2 <= 0){
+    if (this.xPos - radius/2 <= 0){
       //System.out.println("Bump left.");
       if (this.xVel < 0) { 
         xVel *= -1; 
       }
-    } else if (this.xPos + r/2 >= width) {
+    } else if (this.xPos + radius/2 >= width) {
       //System.out.println("Bump right.");
       if (this.xVel > 0) { 
         xVel *= -1; 
       }
     }//end elseif
     
-    if (this.yPos - r/2 <= 0){
+    if (this.yPos - radius/2 <= 0){
       //System.out.println("Bump top.");
       if (this.yVel < 0) { 
         yVel *= -1; 
       }
-    } else if (this.yPos + r/2 >= height) {
+    } else if (this.yPos + radius/2 >= height) {
       //System.out.println("Bump bottom.");
       if (this.yVel > 0) { 
         yVel *= -1; 
       }
     }//end elseif
-    
-    //set acceleration to 0.
-    this.xAcc = 0;
-    this.yAcc = 0;
-    
-    //maybe have the balls resize themselves time to time?    
-  }//end update()
+  }//end ensureObjectIsOnscreen
   
-  void draw(){
+  void draw(){//handles drawing the circle where the metaBall should be. (For testing purposes.)
     noFill();
     stroke(0,0,255);
     strokeWeight(2);
-    ellipse(xPos, yPos, r, r);  
+    ellipse(xPos, yPos, radius, radius);  
   }//end draw() 
 }//end MetaBall class
