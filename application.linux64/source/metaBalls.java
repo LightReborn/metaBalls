@@ -14,13 +14,20 @@ import java.io.IOException;
 
 public class metaBalls extends PApplet {
 
-MetaBall metaBallArray[] = new MetaBall[2];
+//constants
 final static boolean drawingCircles = false;
-static int widthMid, heightMid;
 int luminosity = 95;
+int numberOfBalls = 2;
 
-//===================================================================================================
-//Thread declarations for calculating all the pixels
+//handled at execution globals
+MetaBall metaBallArray[] = new MetaBall[numberOfBalls];
+static int widthMid, heightMid;
+
+//############################################################
+//-----------------------Pixel Threading----------------------
+//############################################################
+
+//Thread object declarations-------------------------------
 //quad1
 Thread q1 = new Thread(new Runnable(){
   @Override
@@ -49,7 +56,8 @@ Thread q4 = new Thread(new Runnable(){
       drawQuadFour();
   }
 });
-//threaded functions definitions
+
+//threaded function definitions.----------------------------
 public void drawQuadOne(){//x: 0-mid y: 0-mid
   for (int x = 0; x < widthMid; x++) {
     for (int y = 0; y < heightMid; y++) {
@@ -57,7 +65,7 @@ public void drawQuadOne(){//x: 0-mid y: 0-mid
       float sum = 0;
       for (MetaBall ball : metaBallArray) {
         float d = dist(x, y, ball.xPos, ball.yPos);
-        sum += luminosity * metaBallArray[0].r / d;
+        sum += luminosity * metaBallArray[0].radius / d;
       
         pixels[index] = color(sum, 100, 100);
       }
@@ -72,7 +80,7 @@ public void drawQuadTwo(){//x: mid-max y:0-mid
       float sum = 0;
       for (MetaBall ball : metaBallArray) {
         float d = dist(x, y, ball.xPos, ball.yPos);
-        sum += luminosity * metaBallArray[0].r / d;
+        sum += luminosity * metaBallArray[0].radius / d;
       
         pixels[index] = color(sum, 100, 100);
       }
@@ -87,7 +95,7 @@ public void drawQuadThree(){//x:0-mid y:mid-max
       float sum = 0;
       for (MetaBall ball : metaBallArray) {
         float d = dist(x, y, ball.xPos, ball.yPos);
-        sum += luminosity * metaBallArray[0].r / d;
+        sum += luminosity * metaBallArray[0].radius / d;
       
         pixels[index] = color(sum, 100, 100);
       }
@@ -102,43 +110,22 @@ public void drawQuadFour(){//x:mid-max y:mid-max
       float sum = 0;
       for (MetaBall ball : metaBallArray) {
         float d = dist(x, y, ball.xPos, ball.yPos);
-        sum += luminosity * metaBallArray[0].r / d;
+        sum += luminosity * metaBallArray[0].radius / d;
       
         pixels[index] = color(sum, 100, 100);
       }
     }
   }
-}//end drawWuadFour
+}//end drawQuadFour
 
-//==============================================================End of pixel threading=====================================================================================
-
-public void setup(){
-   //size(800,600);
-   
-   
-   widthMid = width /2;
-   heightMid = height / 2;
-   
-   //instantiate the balls
-   for (int i = 0; i < metaBallArray.length; i++){
-       metaBallArray[i] = new MetaBall(random(25, width-25), random(25, height-25)); //give a random position on the screen within the constraints of the screen.
-   }
-}//end setup()
-
-public void draw(){
-  background(0);
-  
-  loadPixels();
-  noStroke();
-  colorMode(HSB, 100);
-  
-  //start thread pixel calculations
+public void spawnAllPixelCalculationThreads(){
   q1.run();
   q2.run();
   q3.run();
-  q4.run();
-  
-  //join threads
+  q4.run(); 
+}
+
+public void syncAllPixelCalculationThreads(){
   try{
     q1.join();
     q2.join();
@@ -148,37 +135,67 @@ public void draw(){
   catch (Exception e) {
     System.out.println("Error: " + e);
   }
-  
-  //actually put the pixels up on screen, and begin processes again.
-  updatePixels();
-  
-  //hopefully our gravity calculations are complete by now.
+}//end syncAllThreads
+
+//##################################################
+//------------End of pixel threading----------------
+//##################################################
+
+public void instantiateMetaBalls(){
   for (int i = 0; i < metaBallArray.length; i++){
-    metaBallArray[i].calculateForce(metaBallArray);
-    metaBallArray[i].update();
-    if (drawingCircles) {//draw the circles maybe?
+       metaBallArray[i] = new MetaBall(random(25, width-25), random(25, height-25)); //give a random position on the screen within the constraints of the screen.
+   }
+}
+
+public void updateAllMetaBalls(){
+  for (int i = 0; i < metaBallArray.length; i++){
+    metaBallArray[i].calculateForceByGravity(metaBallArray);
+    metaBallArray[i].updateVelocity();
+    metaBallArray[i].resetAcceleration();
+    metaBallArray[i].updatePosition();
+    metaBallArray[i].ensureObjectIsOnscreen();  
+    if (drawingCircles) {//draw circles where metaBalls are (For testing only. Controlled by global constants.)
       metaBallArray[i].draw(); 
     }
   }
-}//end draw()
+}
 
-public void gravity(){
-    for (int i = 0; i < metaBallArray.length; i++) {
-      metaBallArray[i].calculateForce(metaBallArray);
-    }
-}//end gravity()
+public void setup(){//initializes important variables
+   //size(800,600);
+   
+   
+   widthMid = width /2;
+   heightMid = height / 2;
+   
+   instantiateMetaBalls();
+}//end setup()
+
+public void draw(){ //handles all update calls 
+  background(0);
+  
+  loadPixels();
+  noStroke();
+  colorMode(HSB, 100);
+  
+  spawnAllPixelCalculationThreads();
+  syncAllPixelCalculationThreads();
+  updatePixels();
+  
+  updateAllMetaBalls();
+}//end draw()
 class MetaBall{
-  float r;          //size in radius
+  float radius;          //size in radius
   float xPos, yPos; //position
   float xVel, yVel; //velocity
   float xAcc, yAcc; //acceleration
-  final static float massConstant = 25000;
-  final static float G = 0.00000000006673f; //used in the calculateForce method to calculate the effects of gravity.
-//------------------------------------------------------------------------------------------------------------------
+  final static float massConstant = 25000; //used to tweak interactions between object. The larger the number the greater force each object will exert on other objects
+  final static float G = 0.00000000006673f; //Universal gravity constant; used in the calculateForce method to calculate the effects of gravity.
+  
+//-----------------Constructors-----------------------------
   MetaBall(float x, float y, float r){
     xPos = x;
     yPos = y;
-    this.r = r;
+    radius = r;
     
     xVel = random(1,5)*3;
     yVel = random(1,5)*3;
@@ -187,20 +204,21 @@ class MetaBall{
   MetaBall (float x, float y){
     xPos = x;
     yPos = y;
-    r = random (20,100);
+    radius = random (20,100);
       
     xVel = random(1,5)*3;
     yVel = random(1,5)*3;
   }
-//-------------------------------------------------------------------------------------------------------------
-  public void calculateForce(MetaBall balls[]){
-    //determine the amount of force exterted on this object by other objects.
-    for (int i = 0; i < balls.length; i++){
+//-------------end of constructors--------------------------
+
+  public void calculateForceByGravity(MetaBall balls[]){
+    //determine the amount of force exterted on this object by all other objects.
+    for (int i = 0; i < balls.length; i++){ //for every object in the array.
+      // Formula for calculating force by gravity:
       // F = (G * m1 * m2) / d ^ 2
-      
-      //universal constant for gravity.
-      float m1 = this.r * massConstant;
-      float m2 = balls[i].r * massConstant;
+
+      float m1 = this.radius * massConstant;
+      float m2 = balls[i].radius * massConstant;
       
       //get distance
       float rx = balls[i].xPos - this.xPos;
@@ -208,72 +226,77 @@ class MetaBall{
       float d2 = rx*rx + ry*ry;
       float d = sqrt(d2);
       
-      if (d > r && d > balls[i].r){
+      if (d > radius && d > balls[i].radius){
         // normalize difference vector
-        float ux = rx / r;
-        float uy = ry / r;
+        float ux = rx / radius;
+        float uy = ry / radius;
 
-        // acceleration of gravity
+        // acceleration due to gravity
         float a = G * m1 * m2 / d2;
 
         float Fx = a * ux / 1000;
         float Fy = a * uy / 1000;
         
+        //I would like to seperate this out of this function later.
         this.applyForce(Fx,Fy);
       }
     }
-  }//end calculateForce()
+  }//end calculateForceByGravity()
   
-  public void applyForce(float xForce, float yForce){//seperated from update for easy testing, and better coupling.
+  public void applyForce(float xForce, float yForce){
     xAcc += xForce;
     yAcc += yForce;
   }//end applyForce()
   
-  public void update(){    
+  public void updateVelocity(){
     //update the velocity to account for acceleration.
     xVel += xAcc;
     yVel += yAcc;
-    
+  }//end updateVelocity
+  
+  public void resetAcceleration(){
+    //set acceleration to 0.
+    this.xAcc = 0;
+    this.yAcc = 0; 
+  }//end resetAcceleration()
+  
+  public void updatePosition(){
     xPos += xVel;
     yPos += yVel;
-    
+  }//end updatePosition()
+  
+  public void ensureObjectIsOnscreen(){
     //ensure the objects stay on screen.
-    if (this.xPos - r/2 <= 0){
+    if (this.xPos - radius/2 <= 0){
       //System.out.println("Bump left.");
       if (this.xVel < 0) { 
         xVel *= -1; 
       }
-    } else if (this.xPos + r/2 >= width) {
+    } else if (this.xPos + radius/2 >= width) {
       //System.out.println("Bump right.");
       if (this.xVel > 0) { 
         xVel *= -1; 
       }
     }//end elseif
     
-    if (this.yPos - r/2 <= 0){
+    if (this.yPos - radius/2 <= 0){
       //System.out.println("Bump top.");
       if (this.yVel < 0) { 
         yVel *= -1; 
       }
-    } else if (this.yPos + r/2 >= height) {
+    } else if (this.yPos + radius/2 >= height) {
       //System.out.println("Bump bottom.");
       if (this.yVel > 0) { 
         yVel *= -1; 
       }
     }//end elseif
-    
-    //set acceleration to 0.
-    this.xAcc = 0;
-    this.yAcc = 0;
-    
-    //maybe have the balls resize themselves time to time?    
-  }//end update()
+  }//end ensureObjectIsOnscreen
   
-  public void draw(){
+  public void draw(){//handles drawing the circle where the metaBall should be. (For testing purposes.)
     noFill();
     stroke(0,0,255);
     strokeWeight(2);
-    ellipse(xPos, yPos, r, r);  
+    ellipse(xPos, yPos, radius, radius);  
   }//end draw() 
 }//end MetaBall class
   public void settings() {  fullScreen(); }
