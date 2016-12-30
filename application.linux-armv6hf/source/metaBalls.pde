@@ -1,11 +1,21 @@
 //constants
-final static boolean drawingCircles = false;
 int luminosity = 95;
 int numberOfBalls = 2;
 
 //handled at execution globals
 MetaBall metaBallArray[] = new MetaBall[numberOfBalls];
 static int widthMid, heightMid;
+
+void calculatePixelValue(int x, int y) {
+  int index = x + y * width;
+  float sum = 0;
+  for (MetaBall ball : metaBallArray) {
+    float d = dist(x, y, ball.xPos, ball.yPos);
+    sum += luminosity * metaBallArray[0].radius / d;
+      
+    pixels[index] = color(sum, 100, 100);
+  }
+}
 
 //############################################################
 //-----------------------Pixel Threading----------------------
@@ -45,14 +55,7 @@ Thread q4 = new Thread(new Runnable(){
 void drawQuadOne(){//x: 0-mid y: 0-mid
   for (int x = 0; x < widthMid; x++) {
     for (int y = 0; y < heightMid; y++) {
-      int index = x + y * width;
-      float sum = 0;
-      for (MetaBall ball : metaBallArray) {
-        float d = dist(x, y, ball.xPos, ball.yPos);
-        sum += luminosity * metaBallArray[0].radius / d;
-      
-        pixels[index] = color(sum, 100, 100);
-      }
+      calculatePixelValue(x,y);
     }
   }
 }//end drawQuadOne
@@ -60,14 +63,7 @@ void drawQuadOne(){//x: 0-mid y: 0-mid
 void drawQuadTwo(){//x: mid-max y:0-mid
   for (int x = widthMid; x < width; x++) {
     for (int y = 0; y < heightMid; y++) {
-      int index = x + y * width;
-      float sum = 0;
-      for (MetaBall ball : metaBallArray) {
-        float d = dist(x, y, ball.xPos, ball.yPos);
-        sum += luminosity * metaBallArray[0].radius / d;
-      
-        pixels[index] = color(sum, 100, 100);
-      }
+      calculatePixelValue(x,y);
     }
   }
 }//end drawQuadTwo
@@ -75,14 +71,7 @@ void drawQuadTwo(){//x: mid-max y:0-mid
 void drawQuadThree(){//x:0-mid y:mid-max
   for (int x = 0; x < widthMid; x++) {
     for (int y = heightMid; y < height; y++) {
-      int index = x + y * width;
-      float sum = 0;
-      for (MetaBall ball : metaBallArray) {
-        float d = dist(x, y, ball.xPos, ball.yPos);
-        sum += luminosity * metaBallArray[0].radius / d;
-      
-        pixels[index] = color(sum, 100, 100);
-      }
+      calculatePixelValue(x,y);
     }
   }
 }//end drawQuadThree
@@ -90,14 +79,7 @@ void drawQuadThree(){//x:0-mid y:mid-max
 void drawQuadFour(){//x:mid-max y:mid-max
   for (int x = widthMid; x < width; x++) {
     for (int y = heightMid; y < height; y++) {
-      int index = x + y * width;
-      float sum = 0;
-      for (MetaBall ball : metaBallArray) {
-        float d = dist(x, y, ball.xPos, ball.yPos);
-        sum += luminosity * metaBallArray[0].radius / d;
-      
-        pixels[index] = color(sum, 100, 100);
-      }
+      calculatePixelValue(x,y);
     }
   }
 }//end drawQuadFour
@@ -133,16 +115,30 @@ void instantiateMetaBalls(){
 
 void updateAllMetaBalls(){
   for (int i = 0; i < metaBallArray.length; i++){
-    metaBallArray[i].calculateForceByGravity(metaBallArray);
+    ForceVector gravity = metaBallArray[i].calculateForceByGravity(metaBallArray);
+    metaBallArray[i].applyForce(gravity);
     metaBallArray[i].updateVelocity();
     metaBallArray[i].resetAcceleration();
     metaBallArray[i].updatePosition();
-    metaBallArray[i].ensureObjectIsOnscreen();  
-    if (drawingCircles) {//draw circles where metaBalls are (For testing only. Controlled by global constants.)
-      metaBallArray[i].draw(); 
-    }
+    metaBallArray[i].ensureObjectIsOnscreen();
   }
 }
+
+void syncUpdateAllMetaBallsThread(){
+  try{
+  updateAllMetaBallsThread.join();
+  }
+  catch(Exception e){
+    System.out.println("Exception: " + e);
+  }
+}
+
+Thread updateAllMetaBallsThread = new Thread(new Runnable(){
+  @Override
+  public void run(){
+      updateAllMetaBalls();
+  }
+});
 
 void setup(){//initializes important variables
    //size(800,600);
@@ -150,20 +146,19 @@ void setup(){//initializes important variables
    
    widthMid = width /2;
    heightMid = height / 2;
-   
    instantiateMetaBalls();
 }//end setup()
 
 void draw(){ //handles all update calls 
   background(0);
-  
   loadPixels();
   noStroke();
   colorMode(HSB, 100);
   
   spawnAllPixelCalculationThreads();
   syncAllPixelCalculationThreads();
+  //Pixel Calculations are done, we can update metaballs without race conditions.
+  updateAllMetaBallsThread.run();
   updatePixels();
-  
-  updateAllMetaBalls();
+  syncUpdateAllMetaBallsThread();
 }//end draw()
